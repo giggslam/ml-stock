@@ -87,6 +87,18 @@ class CalcIntersection():
         else:
             return 1
 
+    def calculate_mas_crossing(self, days:'list[int]', data=pd.DataFrame)->'pd.DataFrame':
+        ''' calculate mas crossing signal, e.g. ma3 x ma5, ma3 x ma10 ...
+            params: (list) @days, e.g. days = [3, 5, 10]
+            return: (pd.DataFrame) mas crossing signals, e.g. ['3x5']=1, ['3x10']=0 ...
+        '''
+        crossing_mas = {} # e.g. crossing_mas[3x5], crossing_mas[3x10] ...
+        for day in days:
+            for cross_day in days:
+                if day != cross_day and f'{cross_day}x{day}' not in crossing_mas:
+                    crossing_mas[f'{day}x{cross_day}'] = self.cross_signal(data, day, cross_day)
+        return crossing_mas
+
 def test(stock_id=''):
 
     logger.info('-'*100)
@@ -103,11 +115,24 @@ def test(stock_id=''):
     # print('Cross point:',calc.calculate_intersection(df,'2020-05-05'))
 
     print('-'*50)
-    print('Differnce:',calc.calculate_difference(df))
+    print('next day, Differnce:',calc.calculate_difference(df))
     # print('Differnce:',calc.calculate_difference(df))
 
     print('-'*50)
-    print('Cross signal:',calc.cross_signal(df,3,10))
+    print('today, Cross signal:\n',calc.cross_signal(df,3,10))
+
+    print('='*50)
+    print('today (to become cross), Differnce:',calc.calculate_difference(df[:-1]))
+    # print('Differnce:',calc.calculate_difference(df))
+
+    print('='*50)
+    print('last day, Cross signal:\n',calc.cross_signal(df[:-1],3,10))
+
+    print('-'*60)
+    # days = [3, 5, 10]
+    days = range(1, 10)
+    mas_crossings = calc.calculate_mas_crossing(days=days, data=df)
+    print('mas_crossings:', mas_crossings)
 
 if __name__ == '__main__':
     test(stock_id='TSLA')
