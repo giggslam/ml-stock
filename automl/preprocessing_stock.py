@@ -111,7 +111,7 @@ class Stock_Preprocessing(Preprocessing):
             return: (list)(int) crossing point (0: two line parallel, 1: crossing signal)
         '''
         try:
-            logger.info('calcaulate_mas_crossing_points() ...')
+            # logger.debug('calcaulate_mas_crossing_points() ...')
             crossing_points = [0 for i in range(len(A))] # init list w/ default value
             for i in range(1, len(A)):
                 if (A[i-1]>B[i-1] and A[i]<B[i]) or (A[i-1]<B[i-1] and A[i]>B[i]):
@@ -124,7 +124,7 @@ class Stock_Preprocessing(Preprocessing):
             logger.error(self.traceback.format_exc())
             logger.error(e)
         finally:
-            logger.info('... calcaulate_mas_crossing_points()')
+            # logger.debug('... calcaulate_mas_crossing_points()')
             return crossing_points
 
     def calculate_batch_mas_crossing_points(self, data=pd.DataFrame, days=[])->'dict':
@@ -139,6 +139,7 @@ class Stock_Preprocessing(Preprocessing):
         for day in days:
             for cross_day in days:
                 if day != cross_day and f'ma{cross_day}x{day}' not in crossing_points:
+                    logger.info(f'\tcalculate {day}x{cross_day} ...')
                     crossing_points[f'ma{day}x{cross_day}'] = self.calcaulate_mas_crossing_points(data[f'ma{day}'], data[f'ma{cross_day}'])
         return crossing_points
 
@@ -162,6 +163,30 @@ class Stock_Preprocessing(Preprocessing):
 
         return data
 
+    def calculate_up_down(self, data=pd.DataFrame)->'list,list':
+        ''' calculate stock up/down (e.g. 1: up, -1: down)
+            params: (DataFrame) @data, e.g. stock close price (data['Close'])
+            return: (list) change % (e.g. [0.015, -0.026, ...])
+                    (list) up/down signal (e.g. [1, -1, ...])
+        '''
+        logger.info('calculate_up_down() ...')
+        num_of_rows = len(data.index)
+        updowns = [0 for i in range(num_of_rows)] # init list w/ default value
+        updowns_percents = [0 for i in range(num_of_rows)] # init list w/ default value
+
+        for i in range(1, num_of_rows):
+            last_close = data['Close'][i-1]
+            close = data['Close'][i]
+            if close > last_close:
+                updowns[i] = 1
+            elif close < last_close:
+                updowns[i] = -1
+            else:
+                updowns[i] = 0
+            updowns_percents[i] = close/last_close-1
+
+        return updowns_percents, updowns
+
 def test(stock_id=''):
     logger.info('-'*100)
     logger.info(f'*** {stock_id} ***')
@@ -184,8 +209,8 @@ def test_pipeline(stock_id=''):
     # load stock data from Yahoo
     data = stock_processor.load_data([stock_id])
 
-    # ma_days = [2, 3, 5, 9, 10]
-    ma_days = range(1, 11)
+    ma_days = [1, 2, 3, 5, 9, 10, 20]
+    # ma_days = range(1, 251)
 
     # calculate mas
     mas = stock_processor.calculate_mas(data=data['Close'], days=ma_days)
@@ -219,6 +244,15 @@ def test_pipeline(stock_id=''):
     data = stock_processor.merge_dict_into_data(dict_of_df=cross_signals, data=data)
     print(data.tail(12))
 
+    # calc up/down (e.g. 1: up, -1: down)
+    print('-'*100)
+    updowns_percents, updowns = stock_processor.calculate_up_down(data=data)
+    print(data.tail(5))
+
+    # merge up/down back into stock data
+    data['updown'] = updowns
+    data['updowns_percents'] = updowns_percents
+
     # save stock data to csv
     stock_processor.save_dataframe_to_file(data=data, file_path=f'data/{stock_id}.csv')
 
@@ -231,4 +265,5 @@ if __name__ == '__main__':
     # test(stock_id='NVDA')
 
     # test pipeline
+    test_pipeline(stock_id='TSLA')
     test_pipeline(stock_id='NVDA')
