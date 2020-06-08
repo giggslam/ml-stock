@@ -11,6 +11,7 @@ class Stock_Preprocessing(Preprocessing):
 
     import yfinance as yf
     import pandas as pd
+    import numpy as np
     agent_id = ''
 
     def __init__(self, agent_id='', debug=False):
@@ -127,6 +128,27 @@ class Stock_Preprocessing(Preprocessing):
             # logger.debug('... calcaulate_mas_crossing_points()')
             return crossing_points
 
+    def calcaulate_mas_crossing_points_new(self, A: 'List[int]', B: 'List[int]') -> 'List[int]':
+        ''' find the two MA crossing point
+            params: (list)(int) @A, e.g. MA3
+                    (list)(int) @B, e.g. MA10
+            return: (list)(int) crossing point (0: two line parallel, 1: crossing signal)
+        '''
+        try:
+            # crossing_points = [0 for i in range(len(A))] # init list w/ default value
+            # intersect_list = self.np.intersect1d(A, B)
+            # for intersect_idx in intersect_list:
+            #     crossing_points[intersect_idx] = 1
+            crossing_points = [1 if (A[i-1]>B[i-1] and A[i]<B[i]) or (A[i-1]<B[i-1] and A[i]>B[i]) else 0 for i in range(len(A))]
+
+        except Exception as e:
+            logger.error('ERROR: calcaulate_mas_crossing_points_new()')
+            logger.error(self.traceback.format_exc())
+            logger.error(e)
+        finally:
+            # logger.debug('... calcaulate_mas_crossing_points_new()')
+            return crossing_points
+
     def calculate_batch_mas_crossing_points(self, data=pd.DataFrame, days=[])->'dict':
         ''' calculate list of MAs crossing points (e.g. MA3x10, MA3x20 ...)
             params: (DataFrame) @data, e.g. stock ma (data['MA3'], data['MA10'] ...)
@@ -140,7 +162,9 @@ class Stock_Preprocessing(Preprocessing):
             for cross_day in days:
                 if day != cross_day and f'ma{cross_day}x{day}' not in crossing_points:
                     logger.info(f'\tcalculate {day}x{cross_day} ...')
-                    crossing_points[f'ma{day}x{cross_day}'] = self.calcaulate_mas_crossing_points(data[f'ma{day}'], data[f'ma{cross_day}'])
+                    # crossing_points[f'ma{day}x{cross_day}'] = self.calcaulate_mas_crossing_points(data[f'ma{day}'], data[f'ma{cross_day}'])
+                    crossing_points[f'ma{day}x{cross_day}'] = self.calcaulate_mas_crossing_points_new(data[f'ma{day}'], data[f'ma{cross_day}'])
+
         return crossing_points
 
     def merge_mas_into_data(self, mas:'dict[pd.DataFrame]', data=pd.DataFrame) -> 'pd.DataFrame':
@@ -267,3 +291,4 @@ if __name__ == '__main__':
     # test pipeline
     test_pipeline(stock_id='TSLA')
     test_pipeline(stock_id='NVDA')
+    test_pipeline(stock_id='SYNH')
