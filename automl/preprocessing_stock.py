@@ -116,10 +116,9 @@ class Stock_Preprocessing(Preprocessing):
             crossing_points = [0 for i in range(len(A))] # init list w/ default value
             for i in range(1, len(A)):
                 if (A[i-1]>B[i-1] and A[i]<B[i]) or (A[i-1]<B[i-1] and A[i]>B[i]):
-                    crossing_points[i] = 1
-                    # crossing_points.append(1)
-                # else:
-                    # crossing_points.append(0)
+                    # crossing_points[i] = 1
+                    crossing_points[i] = 1 if A[i]>B[i] else -1
+
         except Exception as e:
             logger.error('ERROR: calcaulate_mas_crossing_points()')
             logger.error(self.traceback.format_exc())
@@ -161,9 +160,9 @@ class Stock_Preprocessing(Preprocessing):
         for day in days:
             for cross_day in days:
                 if day != cross_day and f'ma{cross_day}x{day}' not in crossing_points:
-                    logger.info(f'\tcalculate {day}x{cross_day} ...')
-                    # crossing_points[f'ma{day}x{cross_day}'] = self.calcaulate_mas_crossing_points(data[f'ma{day}'], data[f'ma{cross_day}'])
-                    crossing_points[f'ma{day}x{cross_day}'] = self.calcaulate_mas_crossing_points_new(data[f'ma{day}'], data[f'ma{cross_day}'])
+                    logger.debug(f'\tcalculate {day}x{cross_day} ...')
+                    crossing_points[f'ma{day}x{cross_day}'] = self.calcaulate_mas_crossing_points(data[f'ma{day}'], data[f'ma{cross_day}'])
+                    # crossing_points[f'ma{day}x{cross_day}'] = self.calcaulate_mas_crossing_points_new(data[f'ma{day}'], data[f'ma{cross_day}'])
 
         return crossing_points
 

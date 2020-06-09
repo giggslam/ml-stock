@@ -99,6 +99,56 @@ class CalcIntersection():
                     crossing_mas[f'{day}x{cross_day}'] = self.cross_signal(data, day, cross_day)
         return crossing_mas
 
+    def trade(self, action='buy', price=0.0, amount=0.0, volume=0)->'float,float':
+        ''' start a trade (buy/sell),
+            @param: (string) action, 'buy'/'sell'
+                    (float) amount, for 'buy'&'sell'
+                    (float) price, for 'buy'&'sell'
+                    (int) volume, for sell only
+            e.g.
+            <buy> : (string) action, (float) amount, (float) price
+            <sell>: (string) action
+            return amount, volume
+        '''
+        if action == 'buy':
+            volume = amount // price
+            amount -= (volume * price)
+            logger.debug(f'{action}: {volume} at ${price} (remain: amount={amount}, volume={volume})')
+        elif action == 'sell':
+            amount += volume * price
+            volume = 0
+            logger.debug(f'{action}: {volume} at ${price} (remain: amount:{amount}, volume:{volume})')
+
+        return amount, volume
+
+    def calculate_profit(self, data:'pd.DataFrame', init_capital:'float')->'float':
+        ''' calculate the profit base on signal (data['signal'])
+            return (float) gain, (float) gain_percent, e.g. 10234, 0.45
+
+            * data MUST HAVE 'signal' field, e.g. data['signal']
+        '''
+        logger.debug(f'calculate_profit(init_capital={init_capital}) ...')
+        amount = init_capital; volume = 0
+        gain_percent = 0.0 # 0.1 >>> gain 10%, -0.23 >>> loss 23%
+
+        for i in range(len(data)):
+            signal = data.iloc[i]['signal'] # 'buy'/'sell'
+            price = data.iloc[i]['Close']
+            if signal != '-':
+                logger.debug(f"{data.iloc[i]['Date']} - {signal}")
+                amount, volume = self.trade(action=signal, price=price, amount=amount, volume=volume)
+            # if data.iloc[i]['signal'] == 'buy':
+                # self.trade(action='buy', price=price, amount=amount, volume=volume)
+
+        # sell the remaining volume to finalize the profit
+        if volume:
+            amount, volume = self.trade(action='sell', price=price, amount=amount, volume=volume)
+
+        gain = amount - init_capital
+        gain_percent = round(amount/init_capital-1, 2)
+        return gain, gain_percent
+
+
 def test(stock_id=''):
 
     logger.info('-'*100)
@@ -134,6 +184,36 @@ def test(stock_id=''):
     mas_crossings = calc.calculate_mas_crossing(days=days, data=df)
     print('mas_crossings:', mas_crossings)
 
+def backtest(stock_id:'string', start_date='2020-01-01', init_capital=10000):
+    logger.info('-'*100)
+    logger.info(f'*** {stock_id} ***')
+    logger.info(f'start backtesting (stock_id={stock_id}) ...')
+
+    # read data
+    df = pd.read_csv(f"./data/{stock_id}.csv")
+    print(df.tail())
+    calc = CalcIntersection()
+
+    # cut by the start_date
+    df = df[df['Date'] >= start_date]
+    print(df.head())
+
+    # get signal by features
+    # df = df[df['ma3x10']>]
+    df['signal'] = '-'
+    df.loc[df['ma3x10']>0,'signal'] = 'buy'
+    df.loc[df['ma3x10']<0,'signal'] = 'sell'
+    # df['signal'].fillna('-', inplace=True)
+    print(df.tail(12))
+
+    amount = 10000
+    gain, gain_percent = calc.calculate_profit(data=df, init_capital=amount)
+    print(f'amount: {amount}, gain: {gain}, gain_percent: {gain_percent}')
+
 if __name__ == '__main__':
-    test(stock_id='TSLA')
-    test(stock_id='NVDA')
+    # test(stock_id='TSLA')
+    # test(stock_id='NVDA')
+    # test(stock_id='SYNH')
+
+    # backtest(stock_id='TSLA')
+    backtest(stock_id='NVDA', start_date='2010-01-01', init_capital=10000)
