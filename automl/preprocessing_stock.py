@@ -1,9 +1,6 @@
 # -*- coding: utf-8 -*-
 import traceback
-import logging
-# logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(message)s', datefmt='%m/%d/%Y %I:%M:%S: %p') # show DateTime in logger
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s.%(msecs)03d %(levelname)s:\t%(message)s', datefmt='%Y-%m-%d %H:%M:%S')
-logger = logging.getLogger(__name__)
+from loguru import logger
 
 from preprocessing import Preprocessing
 
@@ -232,13 +229,13 @@ def test_pipeline(stock_id=''):
     # load stock data from Yahoo
     data = stock_processor.load_data([stock_id])
 
-    ma_days = [1, 2, 3, 5, 9, 10, 20]
+    ma_days = [1, 2, 3, 5, 9, 10, 13, 20]
     # ma_days = range(1, 251)
 
     # calculate mas
     mas = stock_processor.calculate_mas(data=data['Close'], days=ma_days)
     print(f'len(mas[3]):{len(mas[3])}')
-    print(f'len(mas[10]):{len(mas[10])}')
+    print(f'len(mas[10]):{len(mas[13])}')
 
     # merge mas back into stock data
     data = stock_processor.merge_mas_into_data(mas=mas, data=data)
@@ -291,3 +288,12 @@ if __name__ == '__main__':
     test_pipeline(stock_id='TSLA')
     test_pipeline(stock_id='NVDA')
     test_pipeline(stock_id='SYNH')
+    test_pipeline(stock_id='^DJI')
+    test_pipeline(stock_id='QQQ')
+    test_pipeline(stock_id='TQQQ')
+    test_pipeline(stock_id='ARKW')
+    test_pipeline(stock_id='ARKG')
+    test_pipeline(stock_id='ARKK')
+    test_pipeline(stock_id='NKLA')
+    # test_pipeline(stock_id='MSFT')
+

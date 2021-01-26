@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
-import logging
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(message)s', datefmt='%m/%d/%Y %I:%M:%S: %p') # show DateTime in logger
-logger = logging.getLogger(__name__)
+import traceback
+from loguru import logger
 
 class Preprocessing:
     ''' Preprocessing tasks, 2020-03-23
