@@ -1,9 +1,7 @@
 import numpy as np
 import pandas as pd
 import traceback
-import logging
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s.%(msecs)03d %(levelname)s:\t%(message)s', datefmt='%Y-%m-%d %H:%M:%S')
-logger = logging.getLogger(__name__)
+from loguru import logger
 
 class CalcIntersection():
 
@@ -77,7 +75,7 @@ class CalcIntersection():
         first_entries = max(window1,window2)*2
         close = data['Close'][-first_entries:]
         ma_df = pd.concat([self.calculate_ma(close, window1),self.calculate_ma(close, window2)], axis=1)
-        logger.debug(ma_df.tail())
+        # logger.debug(ma_df.tail())
         ma_1, ma_2 = ma_df.iloc[-1,0], ma_df.iloc[-1,1]
         day1 = int(ma_1/ma_2)
         ma_1, ma_2 = ma_df.iloc[-2,0], ma_df.iloc[-2,1]
@@ -99,7 +97,7 @@ class CalcIntersection():
                     crossing_mas[f'{day}x{cross_day}'] = self.cross_signal(data, day, cross_day)
         return crossing_mas
 
-    def trade(self, action='buy', price=0.0, amount=0.0, volume=0)->'float,float':
+    def trade(self, action='buy', price=0.0, amount=0.0, volume=0, last_trade_price=0)->'float,float':
         ''' start a trade (buy/sell),
             @param: (string) action, 'buy'/'sell'
                     (float) amount, for 'buy'&'sell'
@@ -108,18 +106,21 @@ class CalcIntersection():
             e.g.
             <buy> : (string) action, (float) amount, (float) price
             <sell>: (string) action
-            return amount, volume
+            return amount, volume, price_different_percent
         '''
+        price_different_percent = round((price - last_trade_price)/last_trade_price, 3) if last_trade_price!=0 else 0.0
         if action == 'buy':
             volume = amount // price
             amount -= (volume * price)
-            logger.debug(f'{action}: {volume} at ${price} (remain: amount={amount}, volume={volume})')
+            logger.debug(f'{action}: {volume} at ${price} ([+-]{round(price_different_percent*100,2)}%) (remain: amount={amount}, volume={volume})')
+            trade_price = price
         elif action == 'sell':
             amount += volume * price
+            logger.debug(f'{action}: {volume} at ${price} ({round(price_different_percent*100,2)}%) (remain: amount:{amount}, volume:0)')
             volume = 0
-            logger.debug(f'{action}: {volume} at ${price} (remain: amount:{amount}, volume:{volume})')
+            trade_price = price
 
-        return amount, volume
+        return amount, volume, trade_price, price_different_percent
 
     def calculate_profit(self, data:'pd.DataFrame', init_capital:'float')->'float':
         ''' calculate the profit base on signal (data['signal'])
@@ -130,19 +131,20 @@ class CalcIntersection():
         logger.debug(f'calculate_profit(init_capital={init_capital}) ...')
         amount = init_capital; volume = 0
         gain_percent = 0.0 # 0.1 >>> gain 10%, -0.23 >>> loss 23%
+        trade_price = 0
 
         for i in range(len(data)):
             signal = data.iloc[i]['signal'] # 'buy'/'sell'
             price = data.iloc[i]['Close']
             if signal != '-':
                 logger.debug(f"{data.iloc[i]['Date']} - {signal}")
-                amount, volume = self.trade(action=signal, price=price, amount=amount, volume=volume)
+                amount, volume, trade_price, price_different_percent = self.trade(action=signal, price=price, amount=amount, volume=volume, last_trade_price=trade_price)
             # if data.iloc[i]['signal'] == 'buy':
                 # self.trade(action='buy', price=price, amount=amount, volume=volume)
 
         # sell the remaining volume to finalize the profit
         if volume:
-            amount, volume = self.trade(action='sell', price=price, amount=amount, volume=volume)
+            amount, volume, trade_price, price_different_percent = self.trade(action='sell', price=price, amount=amount, volume=volume, last_trade_price=trade_price)
 
         gain = amount - init_capital
         gain_percent = round(amount/init_capital-1, 2)
@@ -160,27 +162,30 @@ def test(stock_id=''):
     print(df.tail())
     calc = CalcIntersection()
 
+    window1 = 3
+    window2 = 13
+
     print('-'*50)
-    print('Cross point:',calc.calculate_intersection(df))
+    print('Cross point:',calc.calculate_intersection(df, window1=window1, window2=window2))
     # print('Cross point:',calc.calculate_intersection(df,'2020-05-05'))
 
     print('-'*50)
-    print('next day, Differnce:',calc.calculate_difference(df))
+    print('next day, Differnce:',calc.calculate_difference(df, window1=window1, window2=window2))
     # print('Differnce:',calc.calculate_difference(df))
 
     print('-'*50)
-    print('today, Cross signal:\n',calc.cross_signal(df,3,10))
+    print('today, Cross signal:\n',calc.cross_signal(df,window1=window1, window2=window2))
 
     print('='*50)
-    print('today (to become cross), Differnce:',calc.calculate_difference(df[:-1]))
+    print('today (to become cross), Differnce:',calc.calculate_difference(df[:-1], window1=window1, window2=window2))
     # print('Differnce:',calc.calculate_difference(df))
 
     print('='*50)
-    print('last day, Cross signal:\n',calc.cross_signal(df[:-1],3,10))
+    print('last day, Cross signal:\n',calc.cross_signal(df[:-1],window1=window1, window2=window2))
 
     print('-'*60)
     # days = [3, 5, 10]
-    days = range(1, 10)
+    days = range(1, 14)
     mas_crossings = calc.calculate_mas_crossing(days=days, data=df)
     print('mas_crossings:', mas_crossings)
 
@@ -201,19 +206,33 @@ def backtest(stock_id:'string', start_date='2020-01-01', init_capital=10000):
     # get signal by features
     # df = df[df['ma3x10']>]
     df['signal'] = '-'
-    df.loc[df['ma3x10']>0,'signal'] = 'buy'
-    df.loc[df['ma3x10']<0,'signal'] = 'sell'
+    df.loc[df['ma3x13']>0,'signal'] = 'buy'
+    df.loc[df['ma3x13']<0,'signal'] = 'sell'
     # df['signal'].fillna('-', inplace=True)
     print(df.tail(12))
 
-    amount = 10000
+    amount = init_capital
     gain, gain_percent = calc.calculate_profit(data=df, init_capital=amount)
     print(f'amount: {amount}, gain: {gain}, gain_percent: {gain_percent}')
 
 if __name__ == '__main__':
-    # test(stock_id='TSLA')
-    # test(stock_id='NVDA')
-    # test(stock_id='SYNH')
+    test(stock_id='TSLA')
+    test(stock_id='NVDA')
+    test(stock_id='SYNH')
+    test(stock_id='^DJI')
+    test(stock_id='QQQ')
+    test(stock_id='TQQQ')
+    test(stock_id='ARKW')
+    test(stock_id='ARKG')
+    test(stock_id='ARKK')
+    test(stock_id='NKLA')
+    # test(stock_id='MSFT')
 
-    # backtest(stock_id='TSLA')
-    backtest(stock_id='NVDA', start_date='2010-01-01', init_capital=10000)
+    # backtest(stock_id='TQQQ')
+    # backtest(stock_id='TSLA', start_date='2019-01-01', init_capital=10000)
+    # backtest(stock_id='NVDA', start_date='2019-01-01', init_capital=10000)
+    # backtest(stock_id='SYNH', start_date='2020-01-01', init_capital=10000)
+    # backtest(stock_id='^DJI', start_date='2020-01-01', init_capital=1000000)
+    # backtest(stock_id='QQQ', start_date='2019-01-01', init_capital=10000)
+    # backtest(stock_id='TQQQ', start_date='2020-01-01', init_capital=10000)
+    # backtest(stock_id='ARKW', start_date='2020-01-01', init_capital=10000)
